@@ -50,11 +50,16 @@ def options(opt):
 
     opt.addDependencyOptions(nfdopt, 'librt')
     opt.addDependencyOptions(nfdopt, 'libresolv')
+    opt.addDependencyOptions(nfdopt, 'libpbc')
+    opt.addDependencyOptions(nfdopt, 'libgmp')
+    opt.addDependencyOptions(nfdopt, 'libm')
 
     nfdopt.add_option('--with-tests', action='store_true', default=False,
                       help='Build unit tests')
     nfdopt.add_option('--with-other-tests', action='store_true', default=False,
                       help='Build other tests')
+    nfdopt.add_option('--with-peks', action='store_true', default=False,
+                      help='Build with peks')
 
 PRIVILEGE_CHECK_CODE = '''
 #include <unistd.h>
@@ -110,6 +115,15 @@ def configure(conf):
     if conf.options.with_other_tests:
         conf.env.WITH_OTHER_TESTS = True
         conf.define('WITH_OTHER_TESTS', 1)
+
+    if conf.options.with_peks:
+        conf.env.WITH_PEKS = True
+        conf.define('WITH_PEKS', 1)
+        conf.env.append_value('INCLUDES', ['/usr/local/include/pbc/'])
+        conf.checkDependency(name='libpbc', lib='pbc', mandatory=True)
+        conf.checkDependency(name='libgmp', lib='gmp', mandatory=True)
+        conf.checkDependency(name='libm', lib='m', mandatory=True)
+         
 
     boost_libs = 'system chrono program_options thread log log_setup'
     if conf.options.with_tests or conf.options.with_other_tests:
@@ -174,7 +188,8 @@ def build(bld):
                                        'daemon/face/pcap*.cpp',
                                        'daemon/face/unix*.cpp',
                                        'daemon/face/websocket*.cpp',
-                                       'daemon/main.cpp']),
+                                       'daemon/main.cpp', 
+                                       'daemon/fw/peks/*.cpp']),
         use='core-objects',
         includes='daemon',
         export_includes='daemon')
@@ -193,6 +208,12 @@ def build(bld):
 
     if bld.env.WITH_OTHER_TESTS:
         nfd_objects.source += bld.path.ant_glob('tests/other/fw/*.cpp')
+
+    if bld.env.WITH_PEKS:
+        nfd_objects.source += bld.path.ant_glob('daemon/fw/peks/*.cpp') 
+        nfd_objects.use += ' LIBPBC'
+        nfd_objects.use += ' LIBGMP'
+        nfd_objects.use += ' LIBM'
 
     bld.objects(target='rib-objects',
                 source=bld.path.ant_glob('rib/**/*.cpp'),
